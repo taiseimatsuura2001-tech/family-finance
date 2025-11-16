@@ -6,7 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 // GET /api/categories/:id/subcategories - Get subcategories for a category
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -14,10 +14,13 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // params を await（← Next.js 16 で必須）
+    const { id } = await context.params;
+
     // Verify category belongs to user
     const category = await prisma.category.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     });
@@ -31,7 +34,7 @@ export async function GET(
 
     const subcategories = await prisma.subCategory.findMany({
       where: {
-        categoryId: params.id,
+        categoryId: id,
         isActive: true,
       },
       orderBy: { sortOrder: "asc" },
