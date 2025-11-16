@@ -13,11 +13,10 @@ const updateCategorySchema = z.object({
 });
 
 // PUT /api/categories/:id - Update category
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await context.params;
+
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -29,7 +28,7 @@ export async function PUT(
     // Check if category belongs to user
     const existingCategory = await prisma.category.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     });
@@ -42,7 +41,7 @@ export async function PUT(
     }
 
     const category = await prisma.category.update({
-      where: { id: params.id },
+      where: { id },
       data: validatedData,
       include: {
         subcategories: true,
@@ -68,12 +67,11 @@ export async function PUT(
   }
 }
 
-// DELETE /api/categories/:id - Delete category (soft delete)
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// DELETE /api/categories/:id - Delete category
+export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await context.params;
+
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -82,7 +80,7 @@ export async function DELETE(
     // Check if category belongs to user
     const existingCategory = await prisma.category.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     });
@@ -96,7 +94,7 @@ export async function DELETE(
 
     // Soft delete by setting isActive to false
     await prisma.category.update({
-      where: { id: params.id },
+      where: { id },
       data: { isActive: false },
     });
 
