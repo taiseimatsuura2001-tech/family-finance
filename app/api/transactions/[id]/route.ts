@@ -19,11 +19,24 @@ const updateTransactionSchema = z.object({
   recurringPattern: z.string().optional(),
 });
 
-// GET /api/transactions/:id - Get single transaction
+// Utility: get IP address safely
+function getClientIp(req: NextRequest): string | null {
+  return (
+    req.headers.get("x-forwarded-for") || 
+    req.headers.get("x-real-ip") || 
+    null
+  );
+}
+
+// ------------------------------
+// GET /api/transactions/:id
+// ------------------------------
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
+
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -32,7 +45,7 @@ export async function GET(
 
     const transaction = await prisma.transaction.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
         deletedAt: null,
       },
@@ -64,11 +77,15 @@ export async function GET(
   }
 }
 
-// PUT /api/transactions/:id - Update transaction
+// ------------------------------
+// PUT /api/transactions/:id
+// ------------------------------
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
+
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -78,10 +95,9 @@ export async function PUT(
     const body = await req.json();
     const validatedData = updateTransactionSchema.parse(body);
 
-    // Get existing transaction for audit log
     const existingTransaction = await prisma.transaction.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
         deletedAt: null,
       },
@@ -100,7 +116,7 @@ export async function PUT(
     }
 
     const transaction = await prisma.transaction.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
       include: {
         category: true,
@@ -109,7 +125,6 @@ export async function PUT(
       },
     });
 
-    // Audit log
     await auditLog({
       userId: session.user.id,
       action: "UPDATE",
@@ -117,7 +132,7 @@ export async function PUT(
       entityId: transaction.id,
       beforeData: existingTransaction,
       afterData: transaction,
-      ipAddress: req.ip,
+      ipAddress: getClientIp(req),
       userAgent: req.headers.get("user-agent"),
     });
 
@@ -140,21 +155,24 @@ export async function PUT(
   }
 }
 
-// DELETE /api/transactions/:id - Delete transaction (soft delete)
+// ------------------------------
+// DELETE /api/transactions/:id
+// ------------------------------
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await context.params;
+
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if transaction exists and belongs to user
     const existingTransaction = await prisma.transaction.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
         deletedAt: null,
       },
@@ -167,20 +185,18 @@ export async function DELETE(
       );
     }
 
-    // Soft delete
     const transaction = await prisma.transaction.update({
-      where: { id: params.id },
+      where: { id },
       data: { deletedAt: new Date() },
     });
 
-    // Audit log
     await auditLog({
       userId: session.user.id,
       action: "DELETE",
       entityType: "Transaction",
       entityId: transaction.id,
       beforeData: existingTransaction,
-      ipAddress: req.ip,
+      ipAddress: getClientIp(req),
       userAgent: req.headers.get("user-agent"),
     });
 
