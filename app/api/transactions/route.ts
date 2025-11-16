@@ -19,6 +19,14 @@ const createTransactionSchema = z.object({
   recurringPattern: z.string().optional(),
 });
 
+function getClientIp(req: NextRequest): string | null {
+  return (
+    req.headers.get("x-forwarded-for") || 
+    req.headers.get("x-real-ip") || 
+    null
+  );
+}
+
 // GET /api/transactions - Get transactions list
 export async function GET(req: NextRequest) {
   try {
@@ -121,7 +129,7 @@ export async function POST(req: NextRequest) {
       entityType: "Transaction",
       entityId: transaction.id,
       afterData: transaction,
-      ipAddress: req.ip,
+      ipAddress: getClientIp(req),
       userAgent: req.headers.get("user-agent"),
     });
 
