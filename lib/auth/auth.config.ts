@@ -55,9 +55,10 @@ export const authOptions: NextAuthOptions = {
 
       // Update last login
       if (user.id) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { lastLogin: new Date() },
+        fetch(`${process.env.NEXTAUTH_URL}/api/user/update-last-login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: user.id }),
         }).catch((error) => {
           console.error("Failed to update last login:", error);
         });
