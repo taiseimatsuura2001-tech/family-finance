@@ -10,13 +10,10 @@ const updateTransactionSchema = z.object({
   type: z.enum(["INCOME", "EXPENSE"]).optional(),
   amount: z.number().positive().optional(),
   categoryId: z.string().uuid().optional(),
-  subcategoryId: z.string().uuid().optional(),
   paymentMethodId: z.string().uuid().optional(),
+  vendorId: z.string().uuid().optional(),
   transactionDate: z.string().datetime().optional(),
   description: z.string().optional(),
-  vendor: z.string().optional(),
-  isRecurring: z.boolean().optional(),
-  recurringPattern: z.string().optional(),
 });
 
 // Utility: get IP address safely
@@ -51,7 +48,6 @@ export async function GET(
       },
       include: {
         category: true,
-        subcategory: true,
         paymentMethod: true,
         receipts: true,
       },
@@ -120,7 +116,6 @@ export async function PUT(
       data: updateData,
       include: {
         category: true,
-        subcategory: true,
         paymentMethod: true,
       },
     });

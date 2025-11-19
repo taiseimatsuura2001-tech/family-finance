@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
+import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
   title: "FamilyFinance - 家計管理アプリ",
@@ -18,7 +19,10 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <body className="antialiased">
         <SessionProvider>
-          <QueryProvider>{children}</QueryProvider>
+          <QueryProvider>
+            {children}
+            <Toaster />
+          </QueryProvider>
         </SessionProvider>
       </body>
     </html>

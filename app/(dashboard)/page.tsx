@@ -5,23 +5,49 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { UserSelector } from "@/components/common/UserSelector";
+import { useViewingUser } from "@/components/providers/ViewingUserProvider";
 import { api } from "@/lib/api/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import { TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, Plus } from "lucide-react";
+import { PageLoading } from "@/components/common/Loading";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
+  const { viewUserId, isViewingOther } = useViewingUser();
 
-  const { data: incomeData } = useQuery({
-    queryKey: ["transactions", "INCOME"],
-    queryFn: () => api.getTransactions({ type: "INCOME" }),
+  const currentUserId = session?.user?.id;
+  const targetUserId = viewUserId || currentUserId;
+
+  // Fetch users (must be at top level, before any conditional returns)
+  const { data: usersData, isLoading: isLoadingUsers } = useQuery({
+    queryKey: ["users"],
+    queryFn: () => api.getUsers(),
   });
 
-  const { data: expenseData } = useQuery({
-    queryKey: ["transactions", "EXPENSE"],
-    queryFn: () => api.getTransactions({ type: "EXPENSE" }),
+  const { data: incomeData, isLoading: isLoadingIncome } = useQuery({
+    queryKey: ["transactions", "INCOME", targetUserId],
+    queryFn: () => api.getTransactions({ type: "INCOME", viewUserId: targetUserId }),
+    enabled: !!targetUserId,
   });
+
+  const { data: expenseData, isLoading: isLoadingExpense } = useQuery({
+    queryKey: ["transactions", "EXPENSE", targetUserId],
+    queryFn: () => api.getTransactions({ type: "EXPENSE", viewUserId: targetUserId }),
+    enabled: !!targetUserId,
+  });
+
+  const isLoading = isLoadingIncome || isLoadingExpense || isLoadingUsers;
+
+  // Get the name of the user being viewed
+  const users = usersData?.data || [];
+  const viewedUser = users.find((u: any) => u.id === targetUserId);
+  const viewedUserName = viewedUser?.name || viewedUser?.email?.split('@')[0] || session?.user?.name || session?.user?.email?.split('@')[0] || "ユーザー";
+
+  if (isLoading) {
+    return <PageLoading message="ダッシュボードを読み込んでいます..." />;
+  }
 
   const income = incomeData?.data || [];
   const expenses = expenseData?.data || [];
@@ -55,31 +81,38 @@ export default function DashboardPage() {
   }).length;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-4xl font-bold tracking-tight">
-          ようこそ、{session?.user?.name || session?.user?.email?.split('@')[0]}さん
-        </h1>
-        <p className="text-muted-foreground text-lg">
-          {format(new Date(), "yyyy年M月d日（E）", { locale: ja })}の家計状況
-        </p>
+      <div className="flex justify-between items-start">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isViewingOther ? `${viewedUserName}さんのダッシュボード` : `ようこそ、${viewedUserName}さん`}
+          </h1>
+          <p className="text-muted-foreground text-base">
+            {format(new Date(), "yyyy年M月d日（E）", { locale: ja })}の家計状況
+          </p>
+        </div>
+        <UserSelector />
       </div>
 
       {/* Quick Actions */}
       <div className="flex gap-3">
-        <Link href="/income/new">
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <Plus className="mr-2 h-4 w-4" />
-            収入を登録
-          </Button>
-        </Link>
-        <Link href="/expense/new">
-          <Button className="bg-red-600 hover:bg-red-700">
-            <Plus className="mr-2 h-4 w-4" />
-            支出を登録
-          </Button>
-        </Link>
+        {!isViewingOther && (
+          <>
+            <Link href="/income/new">
+              <Button className="bg-blue-600 hover:bg-blue-700">
+                <Plus className="mr-2 h-4 w-4" />
+                収入を登録
+              </Button>
+            </Link>
+            <Link href="/expense/new">
+              <Button className="bg-red-600 hover:bg-red-700">
+                <Plus className="mr-2 h-4 w-4" />
+                支出を登録
+              </Button>
+            </Link>
+          </>
+        )}
         <Link href="/analysis">
           <Button variant="outline">
             分析を見る
@@ -99,7 +132,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-blue-700">
+            <div className="text-2xl font-bold text-blue-700">
               ¥{currentMonthIncome.toLocaleString()}
             </div>
             <p className="text-xs text-blue-600 mt-1 flex items-center gap-1">
@@ -119,7 +152,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-700">
+            <div className="text-2xl font-bold text-red-700">
               ¥{currentMonthExpense.toLocaleString()}
             </div>
             <p className="text-xs text-red-600 mt-1 flex items-center gap-1">
@@ -149,7 +182,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${
+            <div className={`text-2xl font-bold ${
               currentMonthBalance >= 0 ? "text-green-700" : "text-orange-700"
             }`}>
               ¥{currentMonthBalance.toLocaleString()}
@@ -183,7 +216,7 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-purple-700">
+            <div className="text-2xl font-bold text-purple-700">
               {currentMonthTransactions}件
             </div>
             <p className="text-xs text-purple-600 mt-1">
@@ -196,61 +229,56 @@ export default function DashboardPage() {
       {/* Recent Transactions */}
       <Card className="hover:shadow-lg transition-shadow">
         <CardHeader>
-          <div className="flex justify-between items-center">
-            <div>
-              <CardTitle className="text-2xl">最近の取引</CardTitle>
-              <CardDescription className="mt-1">
-                最新の収支履歴（最大10件）
-              </CardDescription>
-            </div>
-            <Link href="/income">
-              <Button variant="outline" size="sm">
-                すべて見る
-              </Button>
-            </Link>
-          </div>
+          <CardTitle className="text-xl">最近の取引</CardTitle>
+          <CardDescription className="mt-1">
+            最新の収支履歴（最大10件）
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {allTransactions.length === 0 ? (
             <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">まだ取引がありません</p>
-              <div className="flex gap-2 justify-center">
-                <Link href="/income/new">
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                    収入を登録
-                  </Button>
-                </Link>
-                <Link href="/expense/new">
-                  <Button size="sm" className="bg-red-600 hover:bg-red-700">
-                    支出を登録
-                  </Button>
-                </Link>
-              </div>
+              <p className="text-muted-foreground mb-4">
+                {isViewingOther ? "このユーザーの取引はありません" : "まだ取引がありません"}
+              </p>
+              {!isViewingOther && (
+                <div className="flex gap-2 justify-center">
+                  <Link href="/income/new">
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                      収入を登録
+                    </Button>
+                  </Link>
+                  <Link href="/expense/new">
+                    <Button size="sm" className="bg-red-600 hover:bg-red-700">
+                      支出を登録
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {allTransactions.slice(0, 10).map((transaction: any) => (
                 <div
                   key={transaction.id}
-                  className="flex items-center justify-between p-4 rounded-lg border bg-card hover:bg-accent transition-colors"
+                  className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent transition-colors"
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-full ${
+                  <div className="flex items-center gap-3">
+                    <div className={`p-1.5 rounded-full ${
                       transaction.type === "INCOME"
                         ? "bg-blue-100"
                         : "bg-red-100"
                     }`}>
                       {transaction.type === "INCOME" ? (
-                        <ArrowUpRight className={`h-5 w-5 text-blue-600`} />
+                        <ArrowUpRight className={`h-4 w-4 text-blue-600`} />
                       ) : (
-                        <ArrowDownRight className={`h-5 w-5 text-red-600`} />
+                        <ArrowDownRight className={`h-4 w-4 text-red-600`} />
                       )}
                     </div>
                     <div>
-                      <p className="font-medium">
+                      <p className="text-sm font-medium">
                         {transaction.category?.name || "未分類"}
                       </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <span>
                           {format(
                             new Date(transaction.transactionDate),
@@ -267,7 +295,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   </div>
-                  <div className={`text-lg font-semibold ${
+                  <div className={`text-base font-semibold ${
                     transaction.type === "INCOME"
                       ? "text-blue-600"
                       : "text-red-600"

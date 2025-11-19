@@ -10,13 +10,10 @@ const createTransactionSchema = z.object({
   type: z.enum(["INCOME", "EXPENSE"]),
   amount: z.number().positive(),
   categoryId: z.string().uuid(),
-  subcategoryId: z.string().uuid().optional(),
   paymentMethodId: z.string().uuid().optional(),
+  vendorId: z.string().uuid().optional(),
   transactionDate: z.string().datetime(),
   description: z.string().optional(),
-  vendor: z.string().optional(),
-  isRecurring: z.boolean().optional(),
-  recurringPattern: z.string().optional(),
 });
 
 function getClientIp(req: NextRequest): string | null {
@@ -40,11 +37,15 @@ export async function GET(req: NextRequest) {
     const endDate = searchParams.get("endDate");
     const type = searchParams.get("type");
     const categoryId = searchParams.get("categoryId");
+    const viewUserId = searchParams.get("viewUserId");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
+    // Use viewUserId if provided (for viewing other user's data), otherwise use current user
+    const targetUserId = viewUserId || session.user.id;
+
     const where: any = {
-      userId: session.user.id,
+      userId: targetUserId,
       deletedAt: null,
     };
 
@@ -68,7 +69,6 @@ export async function GET(req: NextRequest) {
         where,
         include: {
           category: true,
-          subcategory: true,
           paymentMethod: true,
           receipts: true,
         },
@@ -117,7 +117,6 @@ export async function POST(req: NextRequest) {
       },
       include: {
         category: true,
-        subcategory: true,
         paymentMethod: true,
       },
     });

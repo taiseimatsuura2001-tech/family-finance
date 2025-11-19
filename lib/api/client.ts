@@ -9,6 +9,9 @@ class ApiClient {
       baseURL: process.env.NEXT_PUBLIC_API_URL || "/api",
       headers: {
         "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
       },
     });
 
@@ -45,6 +48,10 @@ class ApiClient {
     return this.client.get("/transactions", { params });
   }
 
+  async getTransaction(id: string) {
+    return this.client.get(`/transactions/${id}`);
+  }
+
   async createTransaction(data: any) {
     return this.client.post("/transactions", data);
   }
@@ -57,17 +64,45 @@ class ApiClient {
     return this.client.delete(`/transactions/${id}`);
   }
 
+  async getVendors() {
+    return this.client.get("/vendors");
+  }
+
+  async getVendor(id: string) {
+    return this.client.get(`/vendors/${id}`);
+  }
+
+  async createVendor(data: any) {
+    return this.client.post("/vendors", data);
+  }
+
+  async updateVendor(id: string, data: any) {
+    return this.client.put(`/vendors/${id}`, data);
+  }
+
+  async deleteVendor(id: string) {
+    return this.client.delete(`/vendors/${id}`);
+  }
+
   // Categories
   async getCategories(params?: any) {
     return this.client.get("/categories", { params });
   }
 
-  async getSubcategories(categoryId: string) {
-    return this.client.get(`/categories/${categoryId}/subcategories`);
+  async getCategory(id: string) {
+    return this.client.get(`/categories/${id}`);
   }
 
   async createCategory(data: any) {
     return this.client.post("/categories", data);
+  }
+
+  async updateCategory(id: string, data: any) {
+    return this.client.put(`/categories/${id}`, data);
+  }
+
+  async deleteCategory(id: string) {
+    return this.client.delete(`/categories/${id}`);
   }
 
   // Payment Methods
@@ -78,6 +113,11 @@ class ApiClient {
   // Reports
   async getSummaryReport(params: any) {
     return this.client.get("/reports/summary", { params });
+  }
+
+  // Users
+  async getUsers() {
+    return this.client.get("/users");
   }
 }
 

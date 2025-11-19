@@ -11,7 +11,17 @@
       "Bash(timeout 60 npm run dev:*)",
       "Bash(curl:*)",
       "Bash(ls:*)",
-      "Bash(npm run db:seed:*)"
+      "Bash(npm run db:seed:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(lsof:*)",
+      "Bash(netstat:*)",
+      "Bash(xargs kill:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx prisma db seed:*)"
     ],
     "deny": [],
     "ask": []

@@ -5,14 +5,14 @@ import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 
 // Validation schema
-const updateCategorySchema = z.object({
+const updateVendorSchema = z.object({
   name: z.string().min(1).optional(),
-  color: z.string().optional(),
+  type: z.enum(["GENERAL", "STORE", "RESTAURANT", "UTILITY", "MEDICAL", "ENTERTAINMENT", "OTHER"]).optional(),
   sortOrder: z.number().int().optional(),
   isActive: z.boolean().optional(),
 });
 
-// PUT /api/categories/:id - Update category
+// PUT /api/vendors/:id - Update vendor
 export async function PUT(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
@@ -23,31 +23,31 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
     }
 
     const body = await req.json();
-    const validatedData = updateCategorySchema.parse(body);
+    const validatedData = updateVendorSchema.parse(body);
 
-    // Check if category belongs to user
-    const existingCategory = await prisma.category.findFirst({
+    // Check if vendor belongs to user
+    const existingVendor = await prisma.vendor.findFirst({
       where: {
         id,
         userId: session.user.id,
       },
     });
 
-    if (!existingCategory) {
+    if (!existingVendor) {
       return NextResponse.json(
-        { error: "Category not found" },
+        { error: "Vendor not found" },
         { status: 404 }
       );
     }
 
-    const category = await prisma.category.update({
+    const vendor = await prisma.vendor.update({
       where: { id },
       data: validatedData,
     });
 
     return NextResponse.json({
       success: true,
-      data: category,
+      data: vendor,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -56,7 +56,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
         { status: 400 }
       );
     }
-    console.error("Error updating category:", error);
+    console.error("Error updating vendor:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -64,7 +64,7 @@ export async function PUT(req: NextRequest, context: { params: Promise<{ id: str
   }
 }
 
-// DELETE /api/categories/:id - Delete category
+// DELETE /api/vendors/:id - Delete vendor
 export async function DELETE(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
@@ -74,33 +74,33 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if category belongs to user
-    const existingCategory = await prisma.category.findFirst({
+    // Check if vendor belongs to user
+    const existingVendor = await prisma.vendor.findFirst({
       where: {
         id,
         userId: session.user.id,
       },
     });
 
-    if (!existingCategory) {
+    if (!existingVendor) {
       return NextResponse.json(
-        { error: "Category not found" },
+        { error: "Vendor not found" },
         { status: 404 }
       );
     }
 
     // Soft delete by setting isActive to false
-    await prisma.category.update({
+    await prisma.vendor.update({
       where: { id },
       data: { isActive: false },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Category deleted successfully",
+      message: "Vendor deleted successfully",
     });
   } catch (error) {
-    console.error("Error deleting category:", error);
+    console.error("Error deleting vendor:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

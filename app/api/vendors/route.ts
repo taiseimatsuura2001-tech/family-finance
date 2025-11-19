@@ -5,15 +5,13 @@ import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 
 // Validation schema
-const createCategorySchema = z.object({
+const createVendorSchema = z.object({
   name: z.string().min(1),
-  type: z.enum(["INCOME", "EXPENSE"]),
-  color: z.string().default("#000000"),
+  type: z.enum(["GENERAL", "STORE", "RESTAURANT", "UTILITY", "MEDICAL", "ENTERTAINMENT", "OTHER"]).default("GENERAL"),
   sortOrder: z.number().int().default(0),
-  isDefault: z.boolean().default(false),
 });
 
-// GET /api/categories - Get categories list
+// GET /api/vendors - Get vendors list
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -23,13 +21,9 @@ export async function GET(req: NextRequest) {
 
     const searchParams = req.nextUrl.searchParams;
     const type = searchParams.get("type");
-    const viewUserId = searchParams.get("viewUserId");
-
-    // Use viewUserId if provided (for viewing other user's data), otherwise use current user
-    const targetUserId = viewUserId || session.user.id;
 
     const where: any = {
-      userId: targetUserId,
+      userId: session.user.id,
       isActive: true,
     };
 
@@ -37,17 +31,17 @@ export async function GET(req: NextRequest) {
       where.type = type;
     }
 
-    const categories = await prisma.category.findMany({
+    const vendors = await prisma.vendor.findMany({
       where,
       orderBy: { sortOrder: "asc" },
     });
 
     return NextResponse.json({
       success: true,
-      data: categories,
+      data: vendors,
     });
   } catch (error) {
-    console.error("Error fetching categories:", error);
+    console.error("Error fetching vendors:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }
@@ -55,7 +49,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/categories - Create category
+// POST /api/vendors - Create vendor
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -64,9 +58,9 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const validatedData = createCategorySchema.parse(body);
+    const validatedData = createVendorSchema.parse(body);
 
-    const category = await prisma.category.create({
+    const vendor = await prisma.vendor.create({
       data: {
         ...validatedData,
         userId: session.user.id,
@@ -75,7 +69,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: category,
+      data: vendor,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -84,7 +78,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    console.error("Error creating category:", error);
+    console.error("Error creating vendor:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
       { status: 500 }

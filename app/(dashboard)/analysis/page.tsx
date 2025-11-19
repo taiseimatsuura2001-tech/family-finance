@@ -1,10 +1,23 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TransactionFilters, FilterValues } from "@/components/common/TransactionFilters";
+import { UserSelector } from "@/components/common/UserSelector";
+import { useViewingUser } from "@/components/providers/ViewingUserProvider";
+import { PageLoading } from "@/components/common/Loading";
 import { api } from "@/lib/api/client";
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, subYears, eachMonthOfInterval, parseISO } from "date-fns";
 import { ja } from "date-fns/locale";
+
+// Default date filter values
+const getDefaultFilters = (): FilterValues => ({
+  startDate: format(subYears(new Date(), 1), "yyyy-MM-dd"),
+  endDate: format(new Date(), "yyyy-MM-dd"),
+});
+
 import {
   BarChart,
   Bar,
@@ -27,47 +40,170 @@ const COLORS = [
 ];
 
 export default function AnalysisPage() {
-  const { data: incomeData } = useQuery({
-    queryKey: ["transactions", "INCOME"],
-    queryFn: () => api.getTransactions({ type: "INCOME" }),
+  const { data: session } = useSession();
+  const { viewUserId } = useViewingUser();
+  const [filters, setFilters] = useState<FilterValues>(getDefaultFilters());
+
+  const currentUserId = session?.user?.id;
+  const targetUserId = viewUserId || currentUserId;
+
+  const { data: incomeData, isLoading: isLoadingIncome } = useQuery({
+    queryKey: ["transactions", "INCOME", targetUserId],
+    queryFn: () => api.getTransactions({ type: "INCOME", viewUserId: targetUserId }),
+    enabled: !!targetUserId,
   });
 
-  const { data: expenseData } = useQuery({
-    queryKey: ["transactions", "EXPENSE"],
-    queryFn: () => api.getTransactions({ type: "EXPENSE" }),
+  const { data: expenseData, isLoading: isLoadingExpense } = useQuery({
+    queryKey: ["transactions", "EXPENSE", targetUserId],
+    queryFn: () => api.getTransactions({ type: "EXPENSE", viewUserId: targetUserId }),
+    enabled: !!targetUserId,
   });
 
-  const income = incomeData?.data || [];
-  const expenses = expenseData?.data || [];
+  const { data: categoriesData, isLoading: isLoadingCategories } = useQuery({
+    queryKey: ["categories", "EXPENSE", targetUserId],
+    queryFn: () => api.getCategories({ type: "EXPENSE", viewUserId: targetUserId }),
+    enabled: !!targetUserId,
+  });
 
-  // Calculate monthly data for the last 6 months
-  const monthlyData = [];
-  for (let i = 5; i >= 0; i--) {
-    const monthDate = subMonths(new Date(), i);
-    const monthStart = startOfMonth(monthDate);
-    const monthEnd = endOfMonth(monthDate);
+  const { data: vendorsData } = useQuery({
+    queryKey: ["vendors"],
+    queryFn: () => api.getVendors(),
+  });
 
-    const monthIncome = income
-      .filter((t: any) => {
-        const date = new Date(t.transactionDate);
-        return date >= monthStart && date <= monthEnd;
-      })
-      .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+  const isLoading = isLoadingIncome || isLoadingExpense || isLoadingCategories;
 
-    const monthExpense = expenses
-      .filter((t: any) => {
-        const date = new Date(t.transactionDate);
-        return date >= monthStart && date <= monthEnd;
-      })
-      .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+  const allIncome = incomeData?.data || [];
+  const allExpenses = expenseData?.data || [];
+  const categories = categoriesData?.data || [];
+  const vendors = vendorsData?.data || [];
 
-    monthlyData.push({
-      month: format(monthDate, "M月", { locale: ja }),
-      収入: monthIncome,
-      支出: monthExpense,
-      差額: monthIncome - monthExpense,
+  // Apply filters
+  const applyFilters = (transactions: any[]) => {
+    return transactions.filter((transaction: any) => {
+      // Date range filter
+      if (filters.startDate) {
+        const transactionDate = new Date(transaction.transactionDate);
+        const startDate = new Date(filters.startDate);
+        if (transactionDate < startDate) return false;
+      }
+      if (filters.endDate) {
+        const transactionDate = new Date(transaction.transactionDate);
+        const endDate = new Date(filters.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        if (transactionDate > endDate) return false;
+      }
+
+      // Amount range filter
+      if (filters.minAmount !== undefined && Number(transaction.amount) < filters.minAmount) {
+        return false;
+      }
+      if (filters.maxAmount !== undefined && Number(transaction.amount) > filters.maxAmount) {
+        return false;
+      }
+
+      // Category filter
+      if (filters.categoryId && transaction.categoryId !== filters.categoryId) {
+        return false;
+      }
+
+      // Vendor filter
+      if (filters.vendorId && transaction.vendorId !== filters.vendorId) {
+        return false;
+      }
+
+      // Keyword filter
+      if (filters.keyword) {
+        const keyword = filters.keyword.toLowerCase();
+        const description = (transaction.description || "").toLowerCase();
+        const vendorName = (transaction.vendor?.name || "").toLowerCase();
+        const categoryName = (transaction.category?.name || "").toLowerCase();
+
+        if (
+          !description.includes(keyword) &&
+          !vendorName.includes(keyword) &&
+          !categoryName.includes(keyword)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
     });
+  };
+
+  const income = useMemo(() => applyFilters(allIncome), [allIncome, filters]);
+  const expenses = useMemo(() => applyFilters(allExpenses), [allExpenses, filters]);
+
+  // Calculate monthly data dynamically based on filtered transactions
+  // Must be before early return to maintain hooks order
+  const monthlyData = useMemo(() => {
+    // Determine the date range for monthly data based on filters or filtered transactions
+    let months: Date[];
+
+    // Get date range from filtered transactions for fallback values
+    const allFilteredTransactions = [...income, ...expenses];
+    let fallbackMinDate = subMonths(new Date(), 5);
+    let fallbackMaxDate = new Date();
+
+    if (allFilteredTransactions.length > 0) {
+      const dates = allFilteredTransactions.map((t: any) => new Date(t.transactionDate));
+      fallbackMinDate = new Date(Math.min(...dates.map(d => d.getTime())));
+      fallbackMaxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+    }
+
+    // Determine start and end dates based on filter values
+    const rangeStart = filters.startDate
+      ? parseISO(filters.startDate)
+      : startOfMonth(fallbackMinDate);
+    const rangeEnd = filters.endDate
+      ? parseISO(filters.endDate)
+      : endOfMonth(fallbackMaxDate);
+
+    // Generate months array
+    if (rangeStart <= rangeEnd) {
+      months = eachMonthOfInterval({
+        start: rangeStart,
+        end: rangeEnd,
+      });
+    } else {
+      // If dates are invalid (start > end), default to last 6 months
+      months = Array.from({ length: 6 }, (_, i) => subMonths(new Date(), 5 - i));
+    }
+
+    return months.map(monthDate => {
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+
+      const monthIncome = income
+        .filter((t: any) => {
+          const date = new Date(t.transactionDate);
+          return date >= monthStart && date <= monthEnd;
+        })
+        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+
+      const monthExpense = expenses
+        .filter((t: any) => {
+          const date = new Date(t.transactionDate);
+          return date >= monthStart && date <= monthEnd;
+        })
+        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+
+      return {
+        month: format(monthDate, "M月", { locale: ja }),
+        収入: monthIncome,
+        支出: monthExpense,
+        差額: monthIncome - monthExpense,
+      };
+    });
+  }, [income, expenses, filters.startDate, filters.endDate]);
+
+  if (isLoading) {
+    return <PageLoading message="分析データを読み込んでいます..." />;
   }
+
+  const handleClearFilters = () => {
+    setFilters(getDefaultFilters());
+  };
 
   // Calculate category breakdown for expenses
   const categoryMap = new Map<string, number>();
@@ -80,85 +216,134 @@ export default function AnalysisPage() {
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
-  // Calculate totals
+  // Calculate totals from filtered data
   const totalIncome = income.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
   const totalExpense = expenses.reduce((sum: number, t: any) => sum + Number(t.amount), 0);
   const balance = totalIncome - totalExpense;
 
-  // Calculate current month data
-  const currentMonthStart = startOfMonth(new Date());
-  const currentMonthEnd = endOfMonth(new Date());
+  // Check if filters are active
+  const hasActiveFilters = Object.values(filters).some(
+    (value) => value !== undefined && value !== ""
+  );
 
-  const currentMonthIncome = income
-    .filter((t: any) => {
-      const date = new Date(t.transactionDate);
-      return date >= currentMonthStart && date <= currentMonthEnd;
-    })
-    .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+  // Summary card labels based on filter state
+  const getSummaryLabel = () => {
+    if (hasActiveFilters) {
+      if (filters.startDate && filters.endDate) {
+        return `${filters.startDate} 〜 ${filters.endDate}`;
+      }
+      if (filters.startDate) {
+        return `${filters.startDate} 〜`;
+      }
+      if (filters.endDate) {
+        return `〜 ${filters.endDate}`;
+      }
+      return "絞り込み後";
+    }
+    return "今月";
+  };
 
-  const currentMonthExpense = expenses
-    .filter((t: any) => {
-      const date = new Date(t.transactionDate);
-      return date >= currentMonthStart && date <= currentMonthEnd;
-    })
-    .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+  // Calculate summary data (filtered period or current month)
+  const summaryIncome = hasActiveFilters
+    ? totalIncome
+    : income
+        .filter((t: any) => {
+          const date = new Date(t.transactionDate);
+          const currentMonthStart = startOfMonth(new Date());
+          const currentMonthEnd = endOfMonth(new Date());
+          return date >= currentMonthStart && date <= currentMonthEnd;
+        })
+        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
+
+  const summaryExpense = hasActiveFilters
+    ? totalExpense
+    : expenses
+        .filter((t: any) => {
+          const date = new Date(t.transactionDate);
+          const currentMonthStart = startOfMonth(new Date());
+          const currentMonthEnd = endOfMonth(new Date());
+          return date >= currentMonthStart && date <= currentMonthEnd;
+        })
+        .reduce((sum: number, t: any) => sum + Number(t.amount), 0);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">分析</h1>
-        <p className="text-muted-foreground mt-1">収支の傾向と分析</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">分析</h1>
+          <p className="text-muted-foreground mt-1">収支の傾向と分析</p>
+        </div>
+        <UserSelector />
       </div>
+
+      {/* Filters */}
+      <TransactionFilters
+        categories={categories}
+        vendors={vendors}
+        filters={filters}
+        onFilterChange={setFilters}
+        onClear={handleClearFilters}
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-blue-900">
-              今月の収入
+              {getSummaryLabel()}の収入
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-700">
-              ¥{currentMonthIncome.toLocaleString()}
+              ¥{summaryIncome.toLocaleString()}
             </div>
+            {hasActiveFilters && (
+              <p className="text-xs text-blue-600 mt-1">
+                {income.length}件
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-red-900">
-              今月の支出
+              {getSummaryLabel()}の支出
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-700">
-              ¥{currentMonthExpense.toLocaleString()}
+              ¥{summaryExpense.toLocaleString()}
             </div>
+            {hasActiveFilters && (
+              <p className="text-xs text-red-600 mt-1">
+                {expenses.length}件
+              </p>
+            )}
           </CardContent>
         </Card>
 
         <Card className={`bg-gradient-to-br ${
-          currentMonthIncome - currentMonthExpense >= 0
+          summaryIncome - summaryExpense >= 0
             ? "from-green-50 to-green-100 border-green-200"
             : "from-orange-50 to-orange-100 border-orange-200"
         }`}>
           <CardHeader className="pb-2">
             <CardTitle className={`text-sm font-medium ${
-              currentMonthIncome - currentMonthExpense >= 0
+              summaryIncome - summaryExpense >= 0
                 ? "text-green-900"
                 : "text-orange-900"
             }`}>
-              今月の収支
+              {getSummaryLabel()}の収支
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${
-              currentMonthIncome - currentMonthExpense >= 0
+              summaryIncome - summaryExpense >= 0
                 ? "text-green-700"
                 : "text-orange-700"
             }`}>
-              ¥{(currentMonthIncome - currentMonthExpense).toLocaleString()}
+              ¥{(summaryIncome - summaryExpense).toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -167,7 +352,18 @@ export default function AnalysisPage() {
       {/* Monthly Trend */}
       <Card>
         <CardHeader>
-          <CardTitle>月次推移（過去6ヶ月）</CardTitle>
+          <CardTitle>
+            月次推移
+            {filters.startDate && filters.endDate
+              ? `（${filters.startDate} 〜 ${filters.endDate}）`
+              : filters.startDate
+              ? `（${filters.startDate} 〜）`
+              : filters.endDate
+              ? `（〜 ${filters.endDate}）`
+              : hasActiveFilters
+              ? "（絞り込み後）"
+              : "（データ全期間）"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -285,7 +481,9 @@ export default function AnalysisPage() {
       {/* Overall Summary */}
       <Card>
         <CardHeader>
-          <CardTitle>全期間サマリー</CardTitle>
+          <CardTitle>
+            {hasActiveFilters ? "絞り込み結果サマリー" : "全期間サマリー"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-3">

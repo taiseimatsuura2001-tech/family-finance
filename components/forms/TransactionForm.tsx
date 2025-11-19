@@ -1,40 +1,40 @@
 "use client";
-
-import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { api } from "@/lib/api/client";
 import {
   DollarSign,
   Calendar,
   Building,
-  CreditCard,
   FileText,
   Tag,
   ArrowUpRight,
   ArrowDownRight,
-  Repeat,
   ArrowLeft
 } from "lucide-react";
 
 const transactionSchema = z.object({
   type: z.enum(["INCOME", "EXPENSE"]),
-  amount: z.number().positive("金額は正の数である必要があります"),
+  amount: z.number().int("金額は整数で入力してください").positive("金額は正の数である必要があります"),
   categoryId: z.string().min(1, "カテゴリーを選択してください"),
-  subcategoryId: z.string().optional(),
-  paymentMethodId: z.string().optional(),
   transactionDate: z.string(),
   description: z.string().optional(),
-  vendor: z.string().optional(),
-  isRecurring: z.boolean().default(false),
-  recurringPattern: z.string().optional(),
+  vendorId: z.string().optional(),
 });
 
 type TransactionFormData = z.infer<typeof transactionSchema>;
@@ -51,7 +51,6 @@ export function TransactionForm({
   onCancel,
 }: TransactionFormProps) {
   const queryClient = useQueryClient();
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>("");
 
   const {
     register,
@@ -64,13 +63,11 @@ export function TransactionForm({
     defaultValues: {
       type: "EXPENSE",
       transactionDate: format(new Date(), "yyyy-MM-dd"),
-      isRecurring: false,
       ...defaultValues,
     },
   });
 
   const type = watch("type");
-  const isRecurring = watch("isRecurring");
 
   // Fetch categories
   const { data: categoriesData } = useQuery({
@@ -78,17 +75,10 @@ export function TransactionForm({
     queryFn: () => api.getCategories({ type }),
   });
 
-  // Fetch subcategories
-  const { data: subcategoriesData } = useQuery({
-    queryKey: ["subcategories", selectedCategoryId],
-    queryFn: () => api.getSubcategories(selectedCategoryId),
-    enabled: !!selectedCategoryId,
-  });
-
-  // Fetch payment methods
-  const { data: paymentMethodsData } = useQuery({
-    queryKey: ["paymentMethods"],
-    queryFn: () => api.getPaymentMethods(),
+  // Fetch vendors
+  const { data: vendorsData } = useQuery({
+    queryKey: ["vendors"],
+    queryFn: () => api.getVendors(),
   });
 
   // Create transaction mutation
@@ -115,8 +105,7 @@ export function TransactionForm({
   };
 
   const categories = categoriesData?.data || [];
-  const subcategories = subcategoriesData?.data || [];
-  const paymentMethods = paymentMethodsData?.data || [];
+  const vendors = vendorsData?.data || [];
 
   return (
     <>
@@ -216,8 +205,8 @@ export function TransactionForm({
                 <Input
                   id="amount"
                   type="number"
-                  step="0.01"
-                  placeholder="0"
+                  step="1"
+                  placeholder=""
                   className="pl-8 text-lg h-12"
                   {...register("amount", { valueAsNumber: true })}
                 />
@@ -236,10 +225,6 @@ export function TransactionForm({
               <select
                 id="categoryId"
                 {...register("categoryId")}
-                onChange={(e) => {
-                  setValue("categoryId", e.target.value);
-                  setSelectedCategoryId(e.target.value);
-                }}
                 className="flex h-12 w-full rounded-md border border-input bg-background px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">選択してください</option>
@@ -256,28 +241,6 @@ export function TransactionForm({
               )}
             </div>
 
-            {/* Subcategory */}
-            {subcategories.length > 0 && (
-              <div>
-                <Label htmlFor="subcategoryId" className="text-base font-semibold flex items-center gap-2 mb-2">
-                  <Tag className="h-4 w-4" />
-                  サブカテゴリー
-                </Label>
-                <select
-                  id="subcategoryId"
-                  {...register("subcategoryId")}
-                  className="flex h-12 w-full rounded-md border border-input bg-background px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">選択してください</option>
-                  {subcategories.map((subcategory: any) => (
-                    <option key={subcategory.id} value={subcategory.id}>
-                      {subcategory.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {/* Date */}
             <div>
               <Label htmlFor="transactionDate" className="text-base font-semibold flex items-center gap-2 mb-2">
@@ -292,41 +255,27 @@ export function TransactionForm({
               />
             </div>
 
-            {/* Payment Method (for expenses only) */}
-            {type === "EXPENSE" && (
-              <div>
-                <Label htmlFor="paymentMethodId" className="text-base font-semibold flex items-center gap-2 mb-2">
-                  <CreditCard className="h-4 w-4" />
-                  支払方法
-                </Label>
-                <select
-                  id="paymentMethodId"
-                  {...register("paymentMethodId")}
-                  className="flex h-12 w-full rounded-md border border-input bg-background px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">選択してください</option>
-                  {paymentMethods.map((method: any) => (
-                    <option key={method.id} value={method.id}>
-                      {method.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             {/* Vendor */}
             <div>
-              <Label htmlFor="vendor" className="text-base font-semibold flex items-center gap-2 mb-2">
+              <Label htmlFor="vendorId" className="text-base font-semibold flex items-center gap-2 mb-2">
                 <Building className="h-4 w-4" />
                 {type === "INCOME" ? "支払元" : "支払先"}
               </Label>
-              <Input
-                id="vendor"
-                type="text"
-                className="h-12 text-base"
-                placeholder={type === "INCOME" ? "会社名など" : "店舗名など"}
-                {...register("vendor")}
-              />
+              <select
+                id="vendorId"
+                {...register("vendorId")}
+                className="flex h-12 w-full rounded-md border border-input bg-background px-4 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">選択してください</option>
+                {vendors.map((vendor: any) => (
+                  <option key={vendor.id} value={vendor.id}>
+                    {vendor.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                支払先を追加する場合は<Link href="/settings/vendors" className="text-blue-600 hover:underline">設定画面</Link>から登録してください
+              </p>
             </div>
 
             {/* Description */}
@@ -342,40 +291,6 @@ export function TransactionForm({
                 placeholder="詳細な説明や補足情報を入力"
                 className="flex w-full rounded-md border border-input bg-background px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-            </div>
-
-            {/* Recurring */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="flex items-center space-x-3">
-                <input
-                  type="checkbox"
-                  id="isRecurring"
-                  {...register("isRecurring")}
-                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                />
-                <Label htmlFor="isRecurring" className="text-base font-medium flex items-center gap-2 cursor-pointer">
-                  <Repeat className="h-4 w-4" />
-                  定期的な取引として登録
-                </Label>
-              </div>
-
-              {isRecurring && (
-                <div className="mt-4">
-                  <Label htmlFor="recurringPattern" className="text-sm font-medium mb-2 block">
-                    繰り返しパターン
-                  </Label>
-                  <select
-                    id="recurringPattern"
-                    {...register("recurringPattern")}
-                    className="flex h-10 w-full rounded-md border border-input bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="daily">毎日</option>
-                    <option value="weekly">毎週</option>
-                    <option value="monthly">毎月</option>
-                    <option value="yearly">毎年</option>
-                  </select>
-                </div>
-              )}
             </div>
 
             {/* Buttons */}
