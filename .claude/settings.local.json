@@ -21,7 +21,8 @@
       "Bash(xargs kill:*)",
       "Bash(npx tsc:*)",
       "Bash(npx ts-node:*)",
-      "Bash(npx prisma db seed:*)"
+      "Bash(npx prisma db seed:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []
