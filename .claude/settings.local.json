@@ -22,7 +22,9 @@
       "Bash(npx tsc:*)",
       "Bash(npx ts-node:*)",
       "Bash(npx prisma db seed:*)",
-      "Bash(npm test:*)"
+      "Bash(npm test:*)",
+      "Bash(npm run test:e2e:*)",
+      "Bash(npx playwright install)"
     ],
     "deny": [],
     "ask": []

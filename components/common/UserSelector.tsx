@@ -25,6 +25,12 @@ export function UserSelector() {
 
   const users = usersData?.data || [];
   const currentUserId = session?.user?.id;
+  const currentUserRole = session?.user?.role;
+
+  // USER role can only view their own data, so don't show the selector
+  if (currentUserRole === 'USER') {
+    return null;
+  }
 
   // ユーザーが1人以下またはデータ取得中は表示しない
   // ただし、ローディング中はスケルトン表示

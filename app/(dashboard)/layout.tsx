@@ -19,7 +19,7 @@ export default async function DashboardLayout({
     <ViewingUserProvider>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50/30">
         <DashboardNav />
-        <main className="container mx-auto py-8 px-6">
+        <main className="container mx-auto py-4 md:py-8 px-4 md:px-6">
           {children}
         </main>
       </div>

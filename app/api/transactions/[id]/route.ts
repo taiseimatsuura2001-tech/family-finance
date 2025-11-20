@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth/auth.config";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { auditLog } from "@/lib/utils/audit";
+import { canViewUserData } from "@/lib/utils/permissions";
 
 // Validation schema
 const updateTransactionSchema = z.object({
@@ -43,7 +44,6 @@ export async function GET(
     const transaction = await prisma.transaction.findFirst({
       where: {
         id,
-        userId: session.user.id,
         deletedAt: null,
       },
       include: {
@@ -57,6 +57,14 @@ export async function GET(
       return NextResponse.json(
         { error: "Transaction not found" },
         { status: 404 }
+      );
+    }
+
+    // Permission check: USER can only view their own data, ADMIN can view all
+    if (!canViewUserData(session.user.role, session.user.id, transaction.userId)) {
+      return NextResponse.json(
+        { error: "Access denied" },
+        { status: 403 }
       );
     }
 

@@ -52,6 +52,7 @@ describe('UserSelector', () => {
           id: 'test-user-id',
           email: 'test@example.com',
           name: 'Test User',
+          role: 'ADMIN', // Default to ADMIN role
         },
       },
       status: 'authenticated',
@@ -137,5 +138,63 @@ describe('UserSelector', () => {
     // staleTime should be 5 minutes (300000ms)
     // This is verified by the component implementation
     expect(mockGetUsers).toHaveBeenCalled();
+  });
+
+  describe('Role-based visibility', () => {
+    it('should NOT render for USER role even with multiple users', async () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'test-user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'USER', // USER role
+          },
+        },
+        status: 'authenticated',
+      });
+
+      mockGetUsers.mockResolvedValue({
+        data: [
+          { id: 'user1', name: 'User 1', email: 'user1@example.com' },
+          { id: 'user2', name: 'User 2', email: 'user2@example.com' },
+        ],
+      });
+
+      const { container } = renderWithProviders(<UserSelector />);
+
+      // Wait for query to complete
+      await waitFor(() => {
+        // USER role should not see the selector
+        expect(container.firstChild).toBeNull();
+      }, { timeout: 3000 });
+    });
+
+    it('should render for ADMIN role with multiple users', async () => {
+      mockUseSession.mockReturnValue({
+        data: {
+          user: {
+            id: 'test-user-id',
+            email: 'test@example.com',
+            name: 'Test User',
+            role: 'ADMIN', // ADMIN role
+          },
+        },
+        status: 'authenticated',
+      });
+
+      mockGetUsers.mockResolvedValue({
+        data: [
+          { id: 'user1', name: 'User 1', email: 'user1@example.com' },
+          { id: 'user2', name: 'User 2', email: 'user2@example.com' },
+        ],
+      });
+
+      renderWithProviders(<UserSelector />);
+
+      // Wait for query to complete
+      await screen.findByText('表示ユーザー:');
+      expect(screen.getByText('表示ユーザー:')).toBeInTheDocument();
+    });
   });
 });

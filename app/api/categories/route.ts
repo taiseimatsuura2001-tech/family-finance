@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth/auth.config";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
+import { validateUserAccess } from "@/lib/utils/permissions";
 
 // Validation schema
 const createCategorySchema = z.object({
@@ -25,8 +26,20 @@ export async function GET(req: NextRequest) {
     const type = searchParams.get("type");
     const viewUserId = searchParams.get("viewUserId");
 
-    // Use viewUserId if provided (for viewing other user's data), otherwise use current user
-    const targetUserId = viewUserId || session.user.id;
+    // Validate user access with permission check
+    let targetUserId: string;
+    try {
+      targetUserId = validateUserAccess(
+        session.user.role,
+        session.user.id,
+        viewUserId
+      );
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Access denied" },
+        { status: 403 }
+      );
+    }
 
     const where: any = {
       userId: targetUserId,

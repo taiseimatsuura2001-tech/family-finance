@@ -224,18 +224,18 @@ export default function IncomePage() {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">収入管理</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">収入管理</h1>
           <p className="text-muted-foreground mt-1 text-sm">
             収入の記録と管理
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
           <UserSelector />
           {!isViewingOther && (
-            <Link href="/income/new">
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+            <Link href="/income/new" className="w-full sm:w-auto">
+              <Button size="sm" className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
                 <Plus className="mr-1 h-3 w-3" />
                 新規登録
               </Button>

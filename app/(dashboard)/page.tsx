@@ -81,14 +81,14 @@ export default function DashboardPage() {
   }).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
             {isViewingOther ? `${viewedUserName}さんのダッシュボード` : `ようこそ、${viewedUserName}さん`}
           </h1>
-          <p className="text-muted-foreground text-base">
+          <p className="text-muted-foreground text-sm md:text-base">
             {format(new Date(), "yyyy年M月d日（E）", { locale: ja })}の家計状況
           </p>
         </div>
@@ -96,17 +96,17 @@ export default function DashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-2 md:gap-3">
         {!isViewingOther && (
           <>
             <Link href="/income/new">
-              <Button className="bg-blue-600 hover:bg-blue-700">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-sm md:text-base">
                 <Plus className="mr-2 h-4 w-4" />
                 収入を登録
               </Button>
             </Link>
             <Link href="/expense/new">
-              <Button className="bg-red-600 hover:bg-red-700">
+              <Button className="bg-red-600 hover:bg-red-700 text-sm md:text-base">
                 <Plus className="mr-2 h-4 w-4" />
                 支出を登録
               </Button>
@@ -114,7 +114,7 @@ export default function DashboardPage() {
           </>
         )}
         <Link href="/analysis">
-          <Button variant="outline">
+          <Button variant="outline" className="text-sm md:text-base">
             分析を見る
           </Button>
         </Link>

@@ -103,7 +103,7 @@ async function main() {
 
   console.log('🌱 Seeding database for all users...\n');
 
-  // Process User 1
+  // Process User 1 (ADMIN role)
   if (user1Email) {
     const user1 = await prisma.user.findUnique({
       where: { email: user1Email },
@@ -111,6 +111,14 @@ async function main() {
 
     if (user1) {
       console.log(`✅ Found user 1: ${user1.email}`);
+
+      // Update user role to ADMIN
+      await prisma.user.update({
+        where: { id: user1.id },
+        data: { role: 'ADMIN' },
+      });
+      console.log(`  🔑 Set role to ADMIN`);
+
       await createCategoriesForUser(user1.id, user1.email);
     } else {
       console.log(`❌ User 1 not found (${user1Email}). Please login first.`);
@@ -119,7 +127,7 @@ async function main() {
     console.log('⚠️  USER1_EMAIL not set in environment variables');
   }
 
-  // Process User 2
+  // Process User 2 (USER role)
   if (user2Email) {
     const user2 = await prisma.user.findUnique({
       where: { email: user2Email },
@@ -127,6 +135,14 @@ async function main() {
 
     if (user2) {
       console.log(`✅ Found user 2: ${user2.email}`);
+
+      // Update user role to USER
+      await prisma.user.update({
+        where: { id: user2.id },
+        data: { role: 'USER' },
+      });
+      console.log(`  🔑 Set role to USER`);
+
       await createCategoriesForUser(user2.id, user2.email);
     } else {
       console.log(`❌ User 2 not found (${user2Email}). Please login first.`);

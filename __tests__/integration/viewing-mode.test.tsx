@@ -90,6 +90,7 @@ describe('Viewing Mode Integration', () => {
           id: 'test-user-id',
           email: 'test@example.com',
           name: 'Test User',
+          role: 'ADMIN', // Default to ADMIN for viewing mode tests
         },
       },
       status: 'authenticated',
@@ -197,6 +198,7 @@ describe('State persistence across navigation', () => {
         user: {
           id: 'test-user-id',
           email: 'test@example.com',
+          role: 'ADMIN',
         },
       },
       status: 'authenticated',

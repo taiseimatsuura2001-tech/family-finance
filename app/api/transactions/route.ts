@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth/auth.config";
 import { prisma } from "@/lib/db/prisma";
 import { z } from "zod";
 import { auditLog } from "@/lib/utils/audit";
+import { validateUserAccess } from "@/lib/utils/permissions";
 
 // Validation schema
 const createTransactionSchema = z.object({
@@ -41,8 +42,20 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "20");
 
-    // Use viewUserId if provided (for viewing other user's data), otherwise use current user
-    const targetUserId = viewUserId || session.user.id;
+    // Validate user access with permission check
+    let targetUserId: string;
+    try {
+      targetUserId = validateUserAccess(
+        session.user.role,
+        session.user.id,
+        viewUserId
+      );
+    } catch (error) {
+      return NextResponse.json(
+        { error: error instanceof Error ? error.message : "Access denied" },
+        { status: 403 }
+      );
+    }
 
     const where: any = {
       userId: targetUserId,

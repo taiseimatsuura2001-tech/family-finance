@@ -162,31 +162,33 @@ export default function CalendarPage() {
   const weekDays = ["日", "月", "火", "水", "木", "金", "土"];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* ヘッダー */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent flex items-center gap-2">
-            <CalendarIcon className="h-8 w-8 text-green-600" />
+          <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent flex items-center gap-2">
+            <CalendarIcon className="h-6 w-6 md:h-8 md:w-8 text-green-600" />
             カレンダー
           </h1>
-          <p className="text-gray-600 mt-1">日別の収支を確認できます</p>
+          <p className="text-gray-600 mt-1 text-sm md:text-base">日別の収支を確認できます</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
           <UserSelector />
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={handleToday}>
+          <div className="flex items-center gap-2 justify-between sm:justify-start">
+            <Button variant="outline" size="sm" onClick={handleToday} className="flex-shrink-0">
               今日
             </Button>
-            <Button variant="outline" size="icon" onClick={handlePreviousMonth}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-lg font-semibold min-w-[140px] text-center">
-              {format(currentMonth, "yyyy年 M月", { locale: ja })}
-            </span>
-            <Button variant="outline" size="icon" onClick={handleNextMonth}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button variant="outline" size="icon" onClick={handlePreviousMonth} className="h-9 w-9">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-base md:text-lg font-semibold min-w-[120px] md:min-w-[140px] text-center">
+                {format(currentMonth, "yyyy年 M月", { locale: ja })}
+              </span>
+              <Button variant="outline" size="icon" onClick={handleNextMonth} className="h-9 w-9">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -224,19 +226,19 @@ export default function CalendarPage() {
       </div>
 
       {/* カレンダー */}
-      <Card className="p-4">
+      <Card className="p-2 md:p-4">
         {isLoading ? (
           <div className="flex items-center justify-center h-96">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="w-full">
             {/* 曜日ヘッダー */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
+            <div className="grid grid-cols-7 gap-0.5 md:gap-1 mb-1 md:mb-2">
               {weekDays.map((day, index) => (
                 <div
                   key={day}
-                  className={`text-center py-2 text-sm font-semibold ${
+                  className={`text-center py-1 md:py-2 text-xs md:text-sm font-semibold ${
                     index === 0 ? "text-red-500" : index === 6 ? "text-blue-500" : "text-gray-600"
                   }`}
                 >
@@ -246,7 +248,7 @@ export default function CalendarPage() {
             </div>
 
             {/* 日付グリッド */}
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 gap-0.5 md:gap-1">
               {calendarDays.map((day) => {
                 const dateKey = format(day, "yyyy-MM-dd");
                 const summary = daySummaries.get(dateKey);
@@ -259,13 +261,13 @@ export default function CalendarPage() {
                     key={dateKey}
                     onClick={() => handleDayClick(day)}
                     className={`
-                      min-h-[100px] p-2 rounded-lg border text-left transition-all
+                      min-h-[60px] md:min-h-[100px] p-1 md:p-2 rounded border md:rounded-lg text-left transition-all
                       hover:bg-gray-50 hover:border-green-300 hover:shadow-sm
                       ${!isCurrentMonth ? "bg-gray-50 opacity-50" : "bg-white"}
                       ${isDayToday ? "border-green-500 border-2 bg-green-50" : "border-gray-200"}
                     `}
                   >
-                    <div className={`text-sm font-medium mb-1 ${
+                    <div className={`text-xs md:text-sm font-medium mb-0.5 md:mb-1 ${
                       !isCurrentMonth
                         ? "text-gray-400"
                         : dayOfWeek === 0
@@ -278,19 +280,19 @@ export default function CalendarPage() {
                     </div>
 
                     {summary && isCurrentMonth && (
-                      <div className="space-y-1">
+                      <div className="space-y-0.5 md:space-y-1">
                         {summary.income > 0 && (
-                          <div className="text-xs text-blue-600 font-medium truncate">
+                          <div className="text-[10px] md:text-xs text-blue-600 font-medium truncate">
                             +¥{summary.income.toLocaleString()}
                           </div>
                         )}
                         {summary.expense > 0 && (
-                          <div className="text-xs text-red-600 font-medium truncate">
+                          <div className="text-[10px] md:text-xs text-red-600 font-medium truncate">
                             -¥{summary.expense.toLocaleString()}
                           </div>
                         )}
                         {summary.transactions.length > 0 && (
-                          <div className="text-xs text-gray-400">
+                          <div className="text-[10px] md:text-xs text-gray-400 hidden sm:block">
                             {summary.transactions.length}件
                           </div>
                         )}
